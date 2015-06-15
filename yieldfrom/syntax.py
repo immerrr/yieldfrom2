@@ -86,7 +86,11 @@ def create_yieldfrom_ast(targets, generator):
                                                     args=[Name(id='__yieldfrom_iter__', ctx=Load())],
                                                     keywords=[],
                                                     starargs=None,
-                                                    kwargs=None))]),
+                                                    kwargs=None)),
+                                            Raise(
+                                                type=Name(id='__yieldfrom_err__', ctx=Load()), inst=None, tback=None)
+                                        ]
+                                    ),
                                     ExceptHandler(
                                         type=Name(id='BaseException', ctx=Load()),
                                         name=Name(id='__yieldfrom_err__', ctx=Store()),

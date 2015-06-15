@@ -7,7 +7,6 @@ def gen_close(iterator):
         pass
     else:
         close_method()
-    raise
 
 
 def gen_result(stop_iteration):
@@ -30,6 +29,7 @@ def yield_from_foobar(generator):
                 __yieldfrom_in__ = yield __yieldfrom_out__
             except GeneratorExit as __yieldfrom_err__:
                 gen_close(__yieldfrom_iter__)
+                raise __yieldfrom_err__
             except BaseException as __yieldfrom_err__:
                 # Propagate gen.throw() downwards.
                 __yieldfrom_exc_info__ = sys.exc_info()
