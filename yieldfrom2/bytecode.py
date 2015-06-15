@@ -2,6 +2,8 @@ import json
 import opcode
 from collections import OrderedDict as odict
 
+from six import get_function_code
+
 
 CO_FLAGS = {
     0x20: 'GEN',
@@ -43,9 +45,9 @@ def func_dict(func):
     return d
 
 
-def disasm_func(func):
+def disasm_code(code):
     # yield OFFSET, BYTES, OPNAME, ARGS
-    code = func.func_code.co_code
+    code = code.co_code
     offset = 0
     n = len(code)
     while offset < n:
@@ -55,7 +57,7 @@ def disasm_func(func):
         while op == opcode.EXTENDED_ARG:
             oparg = (ord(code[offset + 1]) + ord(code[offset + 2]) * 256 +
                      extended_arg)
-            extended_arg = oparg * 65536L
+            extended_arg = oparg * 65536
             oplen += 3
             op = ord(code[offset + oplen - 1])
         has_argument = op >= opcode.HAVE_ARGUMENT
@@ -68,6 +70,10 @@ def disasm_func(func):
         opname = opcode.opname[op]
         yield offset, op, code[offset:offset+oplen], opname, oparg
         offset += oplen
+
+
+def disasm_func(func):
+    return list(disasm_code(get_function_code(func)))
 
 
 def print_func(func):

@@ -1,10 +1,16 @@
 import inspect
 import json
 from ast import (AST, Assign, Attribute, Break, Call, Compare, ExceptHandler,
-                 Expr, If, Is, Load, Name, Num, Raise, Store, TryExcept, While,
+                 Expr, If, Is, Load, Name, Num, Raise, Store, While,
                  Yield, parse, walk, iter_fields)
+try:
+    from ast import TryExcept as Try
+except ImportError:
+    from ast import Try
+
 from collections import OrderedDict as odict
 import sys
+from six import exec_, get_function_code, get_function_globals, PY3
 
 from .utils import gen_result, gen_close
 
@@ -21,7 +27,12 @@ def _resolve(func, ast_obj):
         attr = ast_obj.attr
         return getattr(_resolve(func, next_obj), attr)
     elif isinstance(ast_obj, Name):
-        return func.func_globals[ast_obj.id]
+        func_globals = get_function_globals(func)
+        try:
+            return func_globals[ast_obj.id]
+        except KeyError:
+            import builtins
+            return getattr(builtins, ast_obj.id)
     else:
         raise ValueError("resolve: can't handle node %s" % ast_to_str(ast_obj))
 
@@ -37,7 +48,7 @@ def create_yieldfrom_ast(targets, generator):
                 starargs=None,
                 kwargs=None),
         ),
-        TryExcept(
+        Try(
             body=[
                 Assign(
                     targets=[Name(id='__yieldfrom_out__', ctx=Store())],
@@ -70,7 +81,7 @@ def create_yieldfrom_ast(targets, generator):
                 While(
                         test=Num(n=1),
                         body=[
-                            TryExcept(
+                            Try(
                                 body=[
                                     Assign(
                                         targets=[Name(id='__yieldfrom_in__', ctx=Store())],
@@ -103,7 +114,7 @@ def create_yieldfrom_ast(targets, generator):
                                                     keywords=[],
                                                     starargs=None,
                                                     kwargs=None)),
-                                            TryExcept(
+                                            Try(
                                                 body=[
                                                     Assign(
                                                         targets=[Name(id='__yieldfrom_method__', ctx=Store())],
@@ -121,7 +132,7 @@ def create_yieldfrom_ast(targets, generator):
                                                     )
                                                 ],
                                                 orelse=[
-                                                    TryExcept(
+                                                    Try(
                                                         body=[
                                                             Assign(
                                                                 targets=[Name(id='__yieldfrom_out__', ctx=Store())],
@@ -149,12 +160,12 @@ def create_yieldfrom_ast(targets, generator):
                                                         ],
                                                         orelse=[]
                                                     )
-                                                ]
+                                                ],
                                             )
                                         ])
                                 ],
                                 orelse=[
-                                    TryExcept(
+                                    Try(
                                         body=[
                                             If(test=Compare(left=Name(id='__yieldfrom_in__', ctx=Load()), ops=[Is()], comparators=[Name(id='None', ctx=Load())]),
                                                body=[
@@ -206,8 +217,9 @@ def create_yieldfrom_ast(targets, generator):
                         ],
                         orelse=[]
                 )
-            ]
-        )]
+            ],
+        )
+    ]
     if targets:
         output.append(Assign(
             targets=targets,
@@ -217,6 +229,13 @@ def create_yieldfrom_ast(targets, generator):
         for node in walk(o):
             node.lineno = generator.lineno
             node.col_offset = generator.col_offset
+            if PY3:
+                if (isinstance(node, ExceptHandler) and
+                    isinstance(node.name, Name)):
+                    node.name = node.name.id
+                elif isinstance(node, Try):
+                    node.finalbody = []
+
     return output
 
 
@@ -238,29 +257,22 @@ def ast_to_dict(astobj, dictclass=odict):
     return d
 
 
-
-
-def get_first_lineno(func):
+def parse_func(func):
     if inspect.ismethod(func):
         func = func.im_func
-    if inspect.isfunction(func):
-        func = func.func_code
-    return func.co_firstlineno - 1
-
-
-def parse_func(func):
-    return parse('\n' * get_first_lineno(func) +
-                 inspect.getsource(func.func_code))
+    assert inspect.isfunction(func)
+    code = get_function_code(func)
+    lineno = code.co_firstlineno - 1
+    return parse('\n' * lineno + inspect.getsource(code))
 
 
 def recompile_func(func, astobj):
-    mod_code = compile(
-        astobj, inspect.getfile(func), 'exec')
-    out = func.func_globals.copy()
+    mod_code = compile(astobj, inspect.getfile(func), 'exec')
+    out = get_function_globals(func).copy()
     out['__yieldfrom_gen_result__'] = gen_result
     out['__yieldfrom_gen_close__'] = gen_close
     out['__yieldfrom_get_exc_info__'] = sys.exc_info
-    exec mod_code in out
+    exec_(mod_code, out)
     return out[astobj.body[0].name]
 
 
