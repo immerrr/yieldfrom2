@@ -10,7 +10,7 @@ def gen_close(iterator):
 
 
 def gen_result(stop_iteration):
-    if len(stop_iteration.args) > 1:
+    if len(stop_iteration.args) > 0:
         return stop_iteration.args[0]
     else:
         return None

@@ -15,7 +15,13 @@ from six import exec_, get_function_code, get_function_globals, PY3
 from .bytecode import get_future_flags
 from .utils import gen_result, gen_close
 
-yield_from_ = lambda: None
+
+def yield_from_(iter):
+    raise NotImplementedError
+
+
+def return_(*args):
+    raise StopIteration(*args)
 
 
 def ast_to_str(astobj):
