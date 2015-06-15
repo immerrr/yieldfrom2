@@ -11,8 +11,13 @@ def foobar():
 
 @expand_yield_from
 def yieldfrom_test():
-    x = yield_from_(foobar())
-    print "yieldfrom result: %s" % x
+    try:
+        x = yield_from_(foobar())
+    except Exception as err:
+        print "yieldfrom exc: %s" % err
+        yield_from_([100, 200, 300])
+    else:
+        print "yieldfrom result: %s" % x
 
 
 if __name__ == '__main__':
@@ -22,3 +27,7 @@ if __name__ == '__main__':
         print x
         if x == 1:
             print it.throw(RuntimeError("hello world"))
+            print it.throw(Exception("cuckoo"))
+        if x == 200:
+            import pudb; pudb.set_trace()
+            it.close()

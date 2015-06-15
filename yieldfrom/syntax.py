@@ -2,7 +2,7 @@ import inspect
 import json
 from ast import (AST, Assign, Attribute, Break, Call, Compare, ExceptHandler,
                  Expr, If, Is, Load, Name, Num, Raise, Store, TryExcept, While,
-                 Yield, parse)
+                 Yield, parse, walk, iter_fields)
 from collections import OrderedDict as odict
 import sys
 
@@ -209,18 +209,10 @@ def create_yieldfrom_ast(targets, generator):
             targets=targets,
             value=Name(id='__yieldfrom_result__', ctx=Load())))
 
-    def put_lineno_and_col_offset(obj):
-        if isinstance(obj, list):
-            for subobj in obj:
-                put_lineno_and_col_offset(subobj)
-        if not isinstance(obj, AST):
-            return
-        obj.lineno = generator.lineno
-        obj.col_offset = generator.col_offset
-        for field in obj._fields:
-            put_lineno_and_col_offset(getattr(obj, field, None))
     for o in output:
-        put_lineno_and_col_offset(o)
+        for node in walk(o):
+            node.lineno = generator.lineno
+            node.col_offset = generator.col_offset
     return output
 
 
@@ -268,6 +260,36 @@ def recompile_func(func, astobj):
     return out[astobj.body[0].name]
 
 
+def expand_yield_from_in_list(func, body):
+    """body may be a body of func's descendant node."""
+    num_replacements = 0
+    i = 0
+    while i < len(body):
+        stmt = body[i]
+        if (isinstance(stmt, Expr) and
+            isinstance(stmt.value, Call) and
+            _resolve(func, stmt.value.func) is yield_from_):
+            replacement = create_yieldfrom_ast(
+                targets=None,
+                generator=stmt.value.args[0])
+            body[i:i+1] = replacement
+            i += len(replacement)
+            num_replacements += 1
+
+        elif (isinstance(stmt, Assign) and
+              isinstance(stmt.value, Call) and
+              _resolve(func, stmt.value.func) is yield_from_):
+            replacement = create_yieldfrom_ast(
+                targets=stmt.targets,
+                generator=stmt.value.args[0])
+            body[i:i+1] = replacement
+            i += len(replacement)
+            num_replacements += 1
+        else:
+            i += 1
+    return num_replacements
+
+
 def expand_yield_from(func):
     mod = parse_func(func)
     func_ast = mod.body[0]
@@ -278,30 +300,11 @@ def expand_yield_from(func):
         if _resolve(func, expr) is not expand_yield_from]
 
     num_replacements = 0
-    i = 0
-    while i < len(func_ast.body):
-        stmt = func_ast.body[i]
-        if (isinstance(stmt, Expr) and
-            isinstance(stmt.value, Call) and
-            _resolve(func, stmt.value.func) is yield_from_):
-            replacement = create_yieldfrom_ast(
-                targets=None,
-                generator=stmt.value.args[0])
-            func_ast.body[i:i+1] = replacement
-            i += len(replacement)
-            num_replacements += 1
-
-        elif (isinstance(stmt, Assign) and
-              isinstance(stmt.value, Call) and
-              _resolve(func, stmt.value.func) is yield_from_):
-            replacement = create_yieldfrom_ast(
-                targets=stmt.targets,
-                generator=stmt.value.args[0])
-            func_ast.body[i:i+1] = replacement
-            i += len(replacement)
-            num_replacements += 1
-        else:
-            i += 1
+    for node in walk(func_ast):
+        for name, field in iter_fields(node):
+            if isinstance(field, list):
+                num_replacements += expand_yield_from_in_list(
+                    func, field)
 
     if num_replacements > 0:
         return recompile_func(func, mod)
