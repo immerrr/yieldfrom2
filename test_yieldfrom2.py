@@ -1,4 +1,4 @@
-from yieldfrom.syntax import expand_yield_from, yield_from_
+from yieldfrom2.syntax import expand_yield_from, yield_from_
 
 
 def foobar():
