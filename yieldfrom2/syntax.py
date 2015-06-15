@@ -2,7 +2,7 @@ import inspect
 import json
 from ast import (AST, Assign, Attribute, Break, Call, Compare, ExceptHandler,
                  Expr, If, Is, Load, Name, Num, Raise, Store, While,
-                 Yield, parse, walk, iter_fields)
+                 Yield, walk, iter_fields, PyCF_ONLY_AST)
 try:
     from ast import TryExcept as Try
 except ImportError:
@@ -12,6 +12,7 @@ from collections import OrderedDict as odict
 import sys
 from six import exec_, get_function_code, get_function_globals, PY3
 
+from .bytecode import get_future_flags
 from .utils import gen_result, gen_close
 
 yield_from_ = lambda: None
@@ -263,11 +264,20 @@ def parse_func(func):
     assert inspect.isfunction(func)
     code = get_function_code(func)
     lineno = code.co_firstlineno - 1
-    return parse('\n' * lineno + inspect.getsource(code))
+    return compile(
+        '\n' * lineno + inspect.getsource(code),
+        '<unknown>',
+        mode='exec',
+        flags=PyCF_ONLY_AST | get_future_flags(func),
+        dont_inherit=True)
 
 
 def recompile_func(func, astobj):
-    mod_code = compile(astobj, inspect.getfile(func), 'exec')
+    mod_code = compile(
+        astobj, inspect.getfile(func), 'exec',
+        flags=get_future_flags(func),
+        dont_inherit=True
+    )
     out = get_function_globals(func).copy()
     out['__yieldfrom_gen_result__'] = gen_result
     out['__yieldfrom_gen_close__'] = gen_close

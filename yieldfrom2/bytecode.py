@@ -5,11 +5,33 @@ from collections import OrderedDict as odict
 from six import get_function_code
 
 
+
+import __future__
+FUTURE_FLAGS = [
+    __future__.CO_FUTURE_DIVISION,
+    __future__.CO_FUTURE_PRINT_FUNCTION,
+    __future__.CO_FUTURE_WITH_STATEMENT,
+    __future__.CO_FUTURE_ABSOLUTE_IMPORT,
+    __future__.CO_FUTURE_UNICODE_LITERALS
+]
+
 CO_FLAGS = {
     0x20: 'GEN',
     0x04: 'ARGS',
-    0x08: 'KWARGS'
+    0x08: 'KWARGS',
+    __future__.CO_FUTURE_DIVISION: 'CO_FUTURE_DIVISION',
+    __future__.CO_FUTURE_PRINT_FUNCTION: 'CO_FUTURE_PRINT_FUNCTION',
+    __future__.CO_FUTURE_WITH_STATEMENT: 'CO_FUTURE_WITH_STATEMENT',
+    __future__.CO_FUTURE_ABSOLUTE_IMPORT: 'CO_FUTURE_ABSOLUTE_IMPORT',
+    __future__.CO_FUTURE_UNICODE_LITERALS: 'CO_FUTURE_UNICODE_LITERALS',
 }
+
+
+def get_future_flags(func):
+    flags = 0
+    for f in FUTURE_FLAGS:
+        flags |= f
+    return get_function_code(func).co_flags & flags
 
 
 def flags_str(flags):
