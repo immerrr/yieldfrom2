@@ -23,19 +23,20 @@ def ast_to_str(astobj):
 
 
 def _resolve(func, ast_obj):
-    if isinstance(ast_obj, Attribute):
-        next_obj = ast_obj.value
-        attr = ast_obj.attr
-        return getattr(_resolve(func, next_obj), attr)
-    elif isinstance(ast_obj, Name):
-        func_globals = get_function_globals(func)
-        try:
-            return func_globals[ast_obj.id]
-        except KeyError:
-            import builtins
-            return getattr(builtins, ast_obj.id)
-    else:
-        raise ValueError("resolve: can't handle node %s" % ast_to_str(ast_obj))
+    try:
+        if isinstance(ast_obj, Attribute):
+            next_obj = ast_obj.value
+            attr = ast_obj.attr
+            return getattr(_resolve(func, next_obj), attr)
+        elif isinstance(ast_obj, Name):
+            func_globals = get_function_globals(func)
+            try:
+                return func_globals[ast_obj.id]
+            except KeyError:
+                import builtins
+                return getattr(builtins, ast_obj.id)
+    except (KeyError, AttributeError):
+        return None
 
 
 def create_yieldfrom_ast(targets, generator):
