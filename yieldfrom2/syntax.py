@@ -16,7 +16,7 @@ from .bytecode import get_future_flags
 from .utils import gen_result, gen_close
 
 
-def yield_from_(iter):
+def from_(iter):
     raise NotImplementedError
 
 
@@ -300,21 +300,23 @@ def expand_yield_from_in_list(func, body):
     while i < len(body):
         stmt = body[i]
         if (isinstance(stmt, Expr) and
-            isinstance(stmt.value, Call) and
-            _resolve(func, stmt.value.func) is yield_from_):
+            isinstance(stmt.value, Yield) and
+            isinstance(stmt.value.value, Call) and
+            _resolve(func, stmt.value.value.func) is from_):
             replacement = create_yieldfrom_ast(
                 targets=None,
-                generator=stmt.value.args[0])
+                generator=stmt.value.value.args[0])
             body[i:i+1] = replacement
             i += len(replacement)
             num_replacements += 1
 
         elif (isinstance(stmt, Assign) and
-              isinstance(stmt.value, Call) and
-              _resolve(func, stmt.value.func) is yield_from_):
+              isinstance(stmt.value, Yield) and
+              isinstance(stmt.value.value, Call) and
+              _resolve(func, stmt.value.value.func) is from_):
             replacement = create_yieldfrom_ast(
                 targets=stmt.targets,
-                generator=stmt.value.args[0])
+                generator=stmt.value.value.args[0])
             body[i:i+1] = replacement
             i += len(replacement)
             num_replacements += 1

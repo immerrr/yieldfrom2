@@ -1,8 +1,7 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 
-
-from yieldfrom2.syntax import expand_yield_from, yield_from_, return_
+from yieldfrom2.syntax import expand_yield_from, from_, return_
 
 
 def foobar():
@@ -20,13 +19,13 @@ def foobar():
 @expand_yield_from
 def yieldfrom_test():
     try:
-        x = yield_from_(foobar())
+        x = yield from_(foobar())
         print("yieldfrom result:", x)
-        yield_from_([100, 200, 300])
+        yield from_([100, 200, 300])
     except Exception as err:
         print("yieldfrom exc:", err)
-        yield_from_([1000, 2000])
-        yield_from_(foobar())
+        yield from_([1000, 2000])
+        yield from_(foobar())
 
 
 
